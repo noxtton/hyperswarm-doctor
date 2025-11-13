@@ -3,12 +3,14 @@
 import DHT from 'hyperdht'
 import minimist from 'minimist'
 import b4a from 'b4a'
+import HypercoreID from 'hypercore-id-encoding'
 
 const argv = minimist(process.argv, {
-  alias: { server: 's', client: 'c' }
+  alias: { server: 's', client: 'c', relay: 'r' }
 })
 
 const node = new DHT()
+const relay = argv.relay ? HypercoreID.decode(argv.relay) : null
 
 console.log('Waiting for node to be fully bootstrapped to collect info...')
 await node.ready()
@@ -31,7 +33,9 @@ if (argv.client) {
 
 async function testClient () {
   console.log('Connecting to test server...')
-  const socket = node.connect(b4a.from(argv.client, 'hex'))
+  const socket = node.connect(b4a.from(argv.client, 'hex'), {
+    relayThrough: relay ? () => relay : null
+  })
 
   socket.on('connect', function () {
     console.log('Connected to ' + socket.rawStream.remoteHost)
@@ -76,7 +80,9 @@ async function testServer () {
   console.log('  --server=' + keyPair.secretKey.toString('hex').slice(0, 64))
   console.log()
 
-  const server = node.createServer(function (socket) {
+  const server = node.createServer({
+    relayThrough: relay ? () => relay : null
+  }, function (socket) {
     let error = null
     const remoteHost = socket.rawStream.remoteHost
 
