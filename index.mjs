@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
 import DHT from 'hyperdht'
+import Swarmconf from '@tetherto/swarmconf'
 import minimist from 'minimist'
 import b4a from 'b4a'
 import HypercoreID from 'hypercore-id-encoding'
+import Corestore from 'corestore'
+import Autopass from 'autopass'
 
 const argv = minimist(process.argv, {
   alias: { server: 's', client: 'c', relay: 'r' }
@@ -15,18 +18,24 @@ const relay = argv.relay ? HypercoreID.decode(argv.relay) : null
 console.log('Waiting for node to be fully bootstrapped to collect info...')
 await node.ready()
 
+
 console.log()
 console.log('Node info:')
 console.log('- remote host:', node.host)
 console.log('- remote port:', node.port)
 console.log('- firewalled:', node.firewalled)
 console.log('- nat type:', node.port ? 'consistent' : 'random')
+console.log('- invite:', argv.invite)
 console.log()
 
 if (argv.client) {
   await testClient()
 } else if (argv.server) {
   await testServer()
+} else if (argv.autopassserver) {
+  await testAutoPassServer()
+} else if (argv.autopassclient) {
+  await testAutoPassClient()
 } else {
   await node.destroy()
 }
@@ -34,7 +43,7 @@ if (argv.client) {
 async function testClient () {
   console.log('Connecting to test server...')
   const socket = node.connect(b4a.from(argv.client, 'hex'), {
-    relayThrough: relay ? () => relay : null
+    relayThrough: conf.current.blindRelays
   })
 
   socket.on('connect', function () {
@@ -107,6 +116,83 @@ async function testServer () {
 
   process.once('SIGINT', () => {
     console.log('Shutting down...')
+    node.destroy()
+  })
+}
+
+
+
+async function testAutoPassServer () {
+  console.log('Creating autopass test server...')
+  console.log()
+
+  const store = new Corestore('/tmp/test')
+
+  const conf = new Swarmconf(store)
+  await conf.ready()
+
+
+  console.log()
+  console.log('relay:', conf.current.blindRelays)
+  console.log()
+
+  const autopassStore = new Corestore('/tmp/autopassserver')
+
+  const autopass = new Autopass(autopassStore, {
+    // relayThrough: conf.current.blindRelays
+  })
+
+  await autopass.ready()
+
+  if (autopass.base.writable) {
+    const inv = await autopass.createInvite()
+    console.log('invite', inv)
+  }
+
+  onupdate()
+  autopass.on('update', onupdate)
+
+  function onupdate() {
+    console.log('db changed, all entries:')
+    autopass.list().on('data', console.log)
+  }
+
+  process.once('SIGINT', () => {
+    console.log('Shutting down...')
+
+    autopass.close()
+    autopassStore.close()
+    store.close()
+    node.destroy()
+  })
+}
+
+async function testAutoPassClient () {
+  console.log('Creating autopass test client...')
+  console.log()
+
+  const ts = Date.now()
+
+  let autopassStore = new Corestore(`/tmp/autopassclient/${ts}`)
+  
+  console.log('store ready')
+
+  const autopair = Autopass.pair(autopassStore, argv.invite)
+
+  console.log('invite ready', argv.invite)
+
+  const autopass = await autopair.finished()
+
+  await autopair.ready()
+  
+  await autopass.add('Hello', `Autopass test ${ts}`)
+  console.log('test appended')
+
+  process.once('SIGINT', () => {
+    console.log('Shutting down...')
+
+    autopass.close()
+    autopassStore.close()
     node.destroy()
   })
 }

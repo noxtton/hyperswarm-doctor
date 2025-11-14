@@ -7,6 +7,9 @@
     "hyperswarm-doctor": "./index.mjs"
   },
   "dependencies": {
+    "@tetherto/swarmconf": "github:tetherto/tether-hp-conf-swarm",
+    "autopass": "^3.1.2",
+    "corestore": "^7.6.1",
     "hyperdht": "^6.5.2",
     "minimist": "^1.2.6"
   },
