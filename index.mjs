@@ -42,6 +42,12 @@ if (argv.client) {
 
 async function testClient () {
   console.log('Connecting to test server...')
+
+  const autopassStore = new Corestore('/tmp/autopassserver')
+
+  const conf = new Swarmconf(autopassStore)
+  await conf.ready()
+  
   const socket = node.connect(b4a.from(argv.client, 'hex'), {
     relayThrough: conf.current.blindRelays
   })
@@ -156,7 +162,6 @@ async function testAutoPassServer () {
 
     autopass.close()
     autopassStore.close()
-    store.close()
     node.destroy()
   })
 }
