@@ -126,9 +126,10 @@ async function testAutoPassServer () {
   console.log('Creating autopass test server...')
   console.log()
 
-  const store = new Corestore('/tmp/test')
 
-  const conf = new Swarmconf(store)
+  const autopassStore = new Corestore('/tmp/autopassserver')
+
+  const conf = new Swarmconf(autopassStore)
   await conf.ready()
 
 
@@ -136,10 +137,9 @@ async function testAutoPassServer () {
   console.log('relay:', conf.current.blindRelays)
   console.log()
 
-  const autopassStore = new Corestore('/tmp/autopassserver')
 
   const autopass = new Autopass(autopassStore, {
-    // relayThrough: conf.current.blindRelays
+    relayThrough: conf.current.blindRelays
   })
 
   await autopass.ready()
@@ -149,13 +149,7 @@ async function testAutoPassServer () {
     console.log('invite', inv)
   }
 
-  onupdate()
-  autopass.on('update', onupdate)
-
-  function onupdate() {
-    console.log('db changed, all entries:')
-    autopass.list().on('data', console.log)
-  }
+  autopass.on('update', () => {})
 
   process.once('SIGINT', () => {
     console.log('Shutting down...')
@@ -174,19 +168,27 @@ async function testAutoPassClient () {
   const ts = Date.now()
 
   let autopassStore = new Corestore(`/tmp/autopassclient/${ts}`)
-  
-  console.log('store ready')
+  const conf = new Swarmconf(autopassStore)
+  await conf.ready()
 
-  const autopair = Autopass.pair(autopassStore, argv.invite)
+  console.log('conf ready')
 
-  console.log('invite ready', argv.invite)
+  const autopair = Autopass.pair(autopassStore, argv.invite, {
+    relayThrough: conf.current.blindRelays
+  })
+
+  console.log('autopass created')
 
   const autopass = await autopair.finished()
 
+  console.log('autopair finished')
+
   await autopair.ready()
-  
+
+  console.log('autopair ready')
+
   await autopass.add('Hello', `Autopass test ${ts}`)
-  console.log('test appended')
+  console.log('successfully added entry to autopass')
 
   process.once('SIGINT', () => {
     console.log('Shutting down...')
