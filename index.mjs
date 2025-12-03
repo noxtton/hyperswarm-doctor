@@ -152,8 +152,12 @@ async function testAutoPassServer () {
 
   if (autopass.base.writable) {
     const inv = await autopass.createInvite()
-    console.log('invite', inv)
+    console.log('- invite', inv)
   }
+
+  console.log()
+  console.log('!!! This version of doctor constantly writes data to disk. Please cleanup /tmp/autopassserver directory after testing.')
+  console.log()
 
   autopass.on('update', () => {})
 
@@ -195,8 +199,40 @@ async function testAutoPassClient () {
   await autopass.add('Hello', `Autopass test ${ts}`)
   console.log('successfully added entry to autopass')
 
+  const keyCountTimer = setInterval(async () => {
+    try {
+      const stream = await autopass.list()
+      let length = 0
+      for await (const _ of stream) {
+        length++
+      }
+      console.log(`[Key Count] Current number of entries: ${length}, Timestamp ${Date.now()}`)
+    } catch (err) {
+      console.error('Error querying key count:', err)
+    }
+  }, 5000)
+
+  const addDataTimer = setInterval(async () => {
+    try {
+      const timestamp = Date.now()
+      const randomData = b4a.alloc(5 * 1024 * 1024) // 5MB
+
+      for (let i = 0; i < randomData.length; i++) {
+        randomData[i] = Math.floor(Math.random() * 256)
+      }
+
+      await autopass.add(`data-${timestamp}`, null, randomData)
+      console.log(`[Data Timer] Added 5MB random binary data, Timestamp ${Date.now()}`)
+    } catch (err) {
+      console.error('Error adding data:', err)
+    }
+  }, 60000)
+
   process.once('SIGINT', () => {
     console.log('Shutting down...')
+
+    clearInterval(keyCountTimer)
+    clearInterval(addDataTimer)
 
     autopass.close()
     autopassStore.close()
