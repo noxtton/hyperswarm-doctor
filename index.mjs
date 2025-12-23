@@ -186,15 +186,21 @@ async function testAutoPassClient () {
     relayThrough: conf.current.blindRelays
   })
 
-  console.log('autopass created')
+  const createdAt = new Date()
+
+  console.log('autopass created at ', createdAt.toISOString())
 
   const autopass = await autopair.finished()
 
-  console.log('autopair finished')
+  const finishedAt = new Date()
+  const finishedDuration = new Date().getTime() - createdAt.getTime()
+
+  console.log('autopair finished in ', finishedDuration, 'ms')
 
   await autopair.ready()
 
-  console.log('autopair ready')
+  const readyDuration = new Date().getTime() - finishedAt.getTime()
+  console.log('autopair ready in ', readyDuration, 'ms')
 
   await autopass.add('Hello', `Autopass test ${ts}`)
   console.log('successfully added entry to autopass')
